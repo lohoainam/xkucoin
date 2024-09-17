@@ -5,6 +5,34 @@ import random
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from requests.auth import HTTPProxyAuth
+import itertools
+import sys
+
+# Hàm hiển thị banner
+def show_banner():
+    banner = r"""
+     _    _ _____         _____   ______ _____  _____   _______ ______  
+    \ \  / (_____)  /\   / ___ \ / _____) ___ \(____ \ (_______|_____ \ 
+     \ \/ /   _    /  \ | |   | | /    | |   | |_   \ \ _____   _____) )
+      )  (   | |  / /\ \| |   | | |    | |   | | |   | |  ___) (_____ ( 
+     / /\ \ _| |_| |__| | |___| | \____| |___| | |__/ /| |_____      | |
+    /_/  \_(_____)______|\_____/ \______)_____/|_____/ |_______)     |_|
+                                                                       
+    """
+    print(banner)
+    print("Dev by: Lo Hoài Nam")
+    print("Contact: @Xiaocoderz")
+    time.sleep(1)  # Tạm dừng 1 giây để hiển thị banner trước khi tiếp tục
+
+# Hiệu ứng loading
+def loading_animation(stop_event):
+    for c in itertools.cycle(['|', '/', '-', '\\']):
+        if stop_event.is_set():
+            break
+        sys.stdout.write('\rĐang tải ' + c)
+        sys.stdout.flush()
+        time.sleep(0.1)
+    sys.stdout.write('\rHoàn thành!     \n')
 
 class KucoinAPIClient:
     def __init__(self, account_index=0, proxy=None):
@@ -93,6 +121,20 @@ def load_cookies_and_proxies(cookie_file, proxy_file=None):
     return cookies, proxies
 
 def main():
+    show_banner()  # Hiển thị banner trước khi tiếp tục
+    
+    # Khởi động hiệu ứng loading
+    stop_event = threading.Event()
+    loading_thread = threading.Thread(target=loading_animation, args=(stop_event,))
+    loading_thread.start()
+    
+    # Chạy hiệu ứng loading trong 2 giây
+    time.sleep(2)
+    
+    # Kết thúc hiệu ứng loading sau 2 giây
+    stop_event.set()
+    loading_thread.join()
+
     cookie_file = 'data.txt'
     proxy_file = 'proxy.txt'
 
@@ -100,10 +142,12 @@ def main():
 
     max_threads = 3
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
-        for i, cookie in enumerate(cookies):
-            proxy = proxies[i % len(proxies)] if proxies else None
-            client = KucoinAPIClient(i, proxy)
-            executor.submit(client.process_account, cookie)
+        futures = [executor.submit(KucoinAPIClient(i, proxies[i % len(proxies)] if proxies else None).process_account, cookie) for i, cookie in enumerate(cookies)]
+        # Chờ cho tất cả các nhiệm vụ hoàn thành
+        for future in futures:
+            future.result()
+
+    print("Hoàn thành !")
 
 if __name__ == "__main__":
     main()
